@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ion Builder Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc; /* Slate 50 */
+        }
+        
+        .electron {
+            transition: all 0.3s ease-in-out;
+        }
+
+        .shell {
+            transition: stroke 0.3s ease-in-out;
+        }
+
+        .stable-shell {
+            stroke: #22c55e !important; /* Green 500 */
+            filter: drop-shadow(0 0 8px #22c55e);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-50">
+
+    <!-- Header -->
+    <header class="bg-slate-900 p-4 shadow-md flex justify-between items-center z-10 border-b border-slate-700">
+        <div>
+            <h1 class="text-2xl font-bold text-blue-300">Ion Builder</h1>
+            <p class="text-sm text-slate-200">Form stable ions by adding or removing electrons.</p>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-prev" aria-label="Previous Element" class="bg-blue-800 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition-colors focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                &larr; Previous
+            </button>
+            <button id="btn-next" aria-label="Next Element" class="bg-blue-800 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition-colors focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                Next &rarr;
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row w-full max-w-7xl mx-auto items-stretch">
+        
+        <!-- Left Panel: Controls & Info -->
+        <div class="w-full md:w-1/3 p-6 flex flex-col bg-slate-900 border-b md:border-b-0 md:border-r border-slate-700">
+            
+            <!-- Element Info -->
+            <div class="mb-6 text-center" id="element-info-container" aria-live="polite">
+                <div class="text-sm font-bold text-slate-200 uppercase tracking-widest mb-1">Atomic Number <span id="atomic-number"></span></div>
+                <h2 class="text-4xl font-black mb-2 text-white" id="element-name">Element Name</h2>
+                <div class="text-6xl font-black text-blue-300 mb-2" id="element-symbol">Sym</div>
+            </div>
+
+            <!-- Scoreboard -->
+            <div class="bg-slate-950 rounded-xl p-4 mb-6 border border-slate-700 shadow-inner">
+                <h3 class="text-center font-bold text-slate-200 mb-4 uppercase text-sm tracking-wider">Current State</h3>
+                <div class="grid grid-cols-3 gap-4 text-center" aria-live="polite">
+                    <div>
+                        <div class="text-3xl font-bold text-white" id="stat-protons">0</div>
+                        <div class="text-xs text-slate-200 uppercase font-semibold mt-1">Protons (+)</div>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-bold text-white" id="stat-electrons">0</div>
+                        <div class="text-xs text-slate-200 uppercase font-semibold mt-1">Electrons (-)</div>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-bold text-white bg-slate-800 rounded-lg py-1 border-2 border-slate-600" id="stat-charge">0</div>
+                        <div class="text-xs text-slate-200 uppercase font-semibold mt-1">Net Charge</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-col gap-3 mb-6">
+                <button id="btn-add" aria-label="Add one electron" class="bg-blue-800 hover:bg-blue-700 text-white border-2 border-blue-600 px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors focus:ring-4 focus:ring-blue-300">
+                    <span aria-hidden="true" class="text-white text-xl font-black">+</span> Add Electron
+                </button>
+                <button id="btn-remove" aria-label="Remove one electron" class="bg-red-800 hover:bg-red-700 text-white border-2 border-red-600 px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors focus:ring-4 focus:ring-red-300">
+                    <span aria-hidden="true" class="text-white text-xl font-black">-</span> Remove Electron
+                </button>
+                <button id="btn-check" aria-label="Check Stability" class="bg-green-800 hover:bg-green-700 text-white shadow-lg shadow-green-950 px-4 py-4 rounded-lg font-black text-lg mt-2 transition-all transform hover:scale-[1.02] focus:ring-4 focus:ring-green-300">
+                    Check Stability
+                </button>
+                <button id="btn-reset" aria-label="Reset Atom" class="text-slate-200 hover:text-white text-sm mt-2 underline focus:ring-2 focus:ring-slate-300">
+                    Reset Atom
+                </button>
+            </div>
+
+            <!-- Feedback Area -->
+            <div id="feedback-area" class="mt-auto p-4 rounded-lg hidden text-center border" aria-live="assertive">
+                <h4 id="feedback-title" class="font-bold text-xl mb-1 text-white"></h4>
+                <p id="feedback-message" class="text-sm text-white"></p>
+                <div id="ion-notation" class="text-4xl font-black mt-3 text-white"></div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Visualizer -->
+        <div class="w-full md:w-2/3 p-6 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950 relative min-h-[400px]">
+            <svg id="atom-canvas" role="img" aria-label="Visual representation of the atom and its electrons" class="w-full h-full max-h-[600px]" viewBox="-250 -250 500 500">
+                <!-- SVG Content injected by JS -->
+            </svg>
+        </div>
+
+        <!-- Screen Reader Announcer -->
+        <div id="sr-announcer" class="sr-only" aria-live="polite"></div>
+
+    </main>
+
+    <script>
+        // Data: First 20 Elements
+        const elementsData = [
+            { num: 1, name: "Hydrogen", symbol: "H", p: 1, shells: [1] },
+            { num: 2, name: "Helium", symbol: "He", p: 2, shells: [2] },
+            { num: 3, name: "Lithium", symbol: "Li", p: 3, shells: [2, 1] },
+            { num: 4, name: "Beryllium", symbol: "Be", p: 4, shells: [2, 2] },
+            { num: 5, name: "Boron", symbol: "B", p: 5, shells: [2, 3] },
+            { num: 6, name: "Carbon", symbol: "C", p: 6, shells: [2, 4] },
+            { num: 7, name: "Nitrogen", symbol: "N", p: 7, shells: [2, 5] },
+            { num: 8, name: "Oxygen", symbol: "O", p: 8, shells: [2, 6] },
+            { num: 9, name: "Fluorine", symbol: "F", p: 9, shells: [2, 7] },
+            { num: 10, name: "Neon", symbol: "Ne", p: 10, shells: [2, 8] },
+            { num: 11, name: "Sodium", symbol: "Na", p: 11, shells: [2, 8, 1] },
+            { num: 12, name: "Magnesium", symbol: "Mg", p: 12, shells: [2, 8, 2] },
+            { num: 13, name: "Aluminum", symbol: "Al", p: 13, shells: [2, 8, 3] },
+            { num: 14, name: "Silicon", symbol: "Si", p: 14, shells: [2, 8, 4] },
+            { num: 15, name: "Phosphorus", symbol: "P", p: 15, shells: [2, 8, 5] },
+            { num: 16, name: "Sulfur", symbol: "S", p: 16, shells: [2, 8, 6] },
+            { num: 17, name: "Chlorine", symbol: "Cl", p: 17, shells: [2, 8, 7] },
+            { num: 18, name: "Argon", symbol: "Ar", p: 18, shells: [2, 8, 8] },
+            { num: 19, name: "Potassium", symbol: "K", p: 19, shells: [2, 8, 8, 1] },
+        { num: 20, name: "Calcium", symbol: "Ca", p: 20, shells: [2, 8, 8, 2] }
+    ];
+
+    // Shell capacity rules for the first 20 elements (2, 8, 8, 18)
+    const shellCapacities = [2, 8, 8, 18];
+    
+    // Game State
+    let currentIndex = 0;
+    let currentElement = null;
+    let activeShells = [];
+    let isStableMode = false;
+
+    // DOM Elements
+    const srAnnouncer = document.getElementById('sr-announcer');
+    const elName = document.getElementById('element-name');
+        const elSymbol = document.getElementById('element-symbol');
+        const elNum = document.getElementById('atomic-number');
+        const statProtons = document.getElementById('stat-protons');
+        const statElectrons = document.getElementById('stat-electrons');
+        const statCharge = document.getElementById('stat-charge');
+        const atomCanvas = document.getElementById('atom-canvas');
+        
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const btnAdd = document.getElementById('btn-add');
+        const btnRemove = document.getElementById('btn-remove');
+        const btnCheck = document.getElementById('btn-check');
+        const btnReset = document.getElementById('btn-reset');
+        
+        const feedbackArea = document.getElementById('feedback-area');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const ionNotation = document.getElementById('ion-notation');
+
+        // Initialize
+        function loadElement(index) {
+        currentIndex = index;
+        currentElement = elementsData[index];
+        activeShells = [...currentElement.shells]; // Deep copy
+        isStableMode = false;
+        
+        updateUI();
+        hideFeedback();
+        
+        // Re-trigger animation
+        const container = document.getElementById('element-info-container');
+        container.classList.remove('fade-in');
+        void container.offsetWidth; // trigger reflow
+        container.classList.add('fade-in');
+
+        // Manage button states
+        btnPrev.disabled = currentIndex === 0;
+        btnNext.disabled = currentIndex === elementsData.length - 1;
+
+        srAnnouncer.textContent = `Loaded element ${currentElement.name}. It has ${currentElement.p} protons and ${getTotalElectrons()} electrons.`;
+    }
+
+    // Core Logic
+        function getTotalElectrons() {
+            return activeShells.reduce((sum, count) => sum + count, 0);
+        }
+
+        function getNetCharge() {
+            return currentElement.p - getTotalElectrons();
+        }
+
+        function formatCharge(charge) {
+        if (charge === 0) return "";
+        if (charge === 1) return "⁺";
+        if (charge === -1) return "⁻";
+        if (charge > 1) return charge + "⁺";
+        if (charge < -1) return Math.abs(charge) + "⁻";
+        return "";
+    }
+
+    function isStable() {
+        if (activeShells.length === 0) {
+            return currentElement.num === 1; // Only H+ is stable with 0 electrons
+        }
+        
+        const charge = getNetCharge();
+        if (Math.abs(charge) > 4) return false; // Impossible ions (e.g., Li 7-)
+
+        const lastShellCount = activeShells[activeShells.length - 1];
+        if (activeShells.length === 1 && lastShellCount === 2) return true; // Stable inner shell
+        if (activeShells.length > 1 && lastShellCount === 8) return true; // Stable octet
+        return false;
+    }
+
+    function addElectron() {
+        isStableMode = false;
+        hideFeedback();
+        
+        let total = getTotalElectrons();
+        if(total >= 22) {
+            showHint("Atoms rarely gain this many electrons!");
+            return;
+        }
+
+        if (activeShells.length === 0) {
+            activeShells.push(1);
+            updateUI();
+            srAnnouncer.textContent = `Added electron. Now ${getTotalElectrons()} electrons.`;
+            return;
+        }
+
+        let lastShellIndex = activeShells.length - 1;
+        let currentCap = lastShellIndex === 0 ? 2 : 8;
+        
+        // If current outer shell is full
+        if (activeShells[lastShellIndex] >= currentCap) {
+            // Only allow adding a new shell if recovering an emptied neutral shell
+            if (activeShells.length < currentElement.shells.length) {
+                activeShells.push(1);
+            } else {
+                showHint(`The valence shell is full (${currentCap} electrons)! Atoms do not add extra valence shells to form ions.`);
+                return;
+            }
+        } else {
+            activeShells[lastShellIndex]++;
+        }
+        
+        updateUI();
+        srAnnouncer.textContent = `Added electron. Now ${getTotalElectrons()} electrons.`;
+    }
+
+    function removeElectron() {
+        isStableMode = false;
+        hideFeedback();
+        
+        if (activeShells.length === 0) {
+            showHint("No electrons left to remove!");
+            return;
+        }
+
+        let lastShellIndex = activeShells.length - 1;
+        activeShells[lastShellIndex]--;
+
+        // If a shell becomes empty, remove it
+        if (activeShells[lastShellIndex] === 0) {
+            activeShells.pop();
+        }
+        
+        updateUI();
+        srAnnouncer.textContent = `Removed electron. Now ${getTotalElectrons()} electrons.`;
+    }
+
+    function checkStability() {
+        const total = getTotalElectrons();
+        const charge = getNetCharge();
+        const stable = isStable();
+        
+        const lastShellCount = activeShells.length > 0 ? activeShells[activeShells.length - 1] : 0;
+        const hasOctet = (activeShells.length === 1 && lastShellCount === 2) || (activeShells.length > 1 && lastShellCount === 8);
+        
+        // Reset background classes
+        feedbackArea.classList.remove('hidden', 'bg-red-900', 'border-red-500', 'bg-green-800', 'border-green-400', 'bg-yellow-900', 'border-yellow-500');
+
+        if (stable) {
+            isStableMode = true;
+            
+            feedbackArea.classList.add('bg-green-800', 'border-green-400');
+            
+            if (charge === 0) {
+                feedbackTitle.textContent = "Success! Already Stable.";
+                feedbackMessage.textContent = `${currentElement.name} is a Noble Gas with a full outer shell. It does not naturally form an ion.`;
+            } else {
+                feedbackTitle.textContent = "Success! Stable Ion Formed.";
+                const action = charge > 0 ? "lost" : "gained";
+                const amount = Math.abs(charge);
+                const plural = amount > 1 ? "electrons" : "electron";
+                feedbackMessage.textContent = `The atom ${action} ${amount} ${plural} to achieve a full outer shell (like a noble gas).`;
+            }
+            
+            ionNotation.innerHTML = `${currentElement.symbol}<sup>${formatCharge(charge)}</sup>`;
+            srAnnouncer.textContent = feedbackTitle.textContent + " " + feedbackMessage.textContent;
+        } else {
+            isStableMode = false;
+            
+            if (hasOctet && Math.abs(charge) > 4) {
+                feedbackArea.classList.add('bg-yellow-900', 'border-yellow-500');
+                feedbackTitle.textContent = "Too Much Energy!";
+                feedbackMessage.textContent = `While the outer shell is full, forming a ${charge > 0 ? '+' : ''}${charge} ion requires too much energy. Atoms rarely gain or lose more than 3 or 4 electrons. Try going the other way!`;
+            } else {
+                feedbackArea.classList.add('bg-red-900', 'border-red-500');
+                feedbackTitle.textContent = "Not Quite Stable.";
+                feedbackMessage.textContent = "Hint: Atoms want their outermost shell to be full (usually 8 electrons, or 2 for the innermost shell). Keep adding or removing!";
+            }
+            ionNotation.innerHTML = "";
+            srAnnouncer.textContent = feedbackTitle.textContent + " " + feedbackMessage.textContent;
+        }
+        
+        renderAtom(); // Re-render to show green highlight if stable
+    }
+
+    // UI Updates
+    function updateUI() {
+        elName.textContent = currentElement.name;
+        elSymbol.textContent = currentElement.symbol;
+        elNum.textContent = currentElement.p;
+        
+        statProtons.textContent = currentElement.p;
+        statElectrons.textContent = getTotalElectrons();
+        
+        const charge = getNetCharge();
+        statCharge.textContent = charge > 0 ? `+${charge}` : charge;
+        
+        // Adjust charge color based on value for AAA contrast
+        statCharge.className = `text-3xl font-bold rounded-lg py-1 border-2 ${charge > 0 ? 'text-white border-red-500 bg-red-900' : charge < 0 ? 'text-white border-blue-500 bg-blue-900' : 'text-white border-slate-500 bg-slate-800'}`;
+
+        renderAtom();
+    }
+
+    function showHint(msg) {
+        feedbackArea.classList.remove('hidden', 'bg-red-900', 'border-red-500', 'bg-green-800', 'border-green-400');
+        feedbackArea.classList.add('bg-yellow-900', 'border-yellow-500');
+        feedbackTitle.textContent = "Notice";
+        feedbackMessage.textContent = msg;
+        ionNotation.innerHTML = "";
+        srAnnouncer.textContent = "Notice: " + msg;
+    }
+
+    function hideFeedback() {
+            feedbackArea.classList.add('hidden');
+        }
+
+        // Visualizer (SVG)
+        function renderAtom() {
+            atomCanvas.innerHTML = ''; // Clear existing
+            
+            // Draw Nucleus
+            const nucleusGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            
+            const nucleusCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            nucleusCircle.setAttribute("cx", "0");
+            nucleusCircle.setAttribute("cy", "0");
+            nucleusCircle.setAttribute("r", "25");
+            nucleusCircle.setAttribute("fill", "#ef4444"); // red-500
+            nucleusCircle.setAttribute("stroke", "#7f1d1d"); // red-900
+            nucleusCircle.setAttribute("stroke-width", "2");
+            
+            const nucleusText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            nucleusText.setAttribute("x", "0");
+            nucleusText.setAttribute("y", "5");
+            nucleusText.setAttribute("text-anchor", "middle");
+            nucleusText.setAttribute("fill", "white");
+            nucleusText.setAttribute("font-weight", "bold");
+            nucleusText.setAttribute("font-size", "14");
+            nucleusText.textContent = `${currentElement.symbol}`;
+
+            nucleusGroup.appendChild(nucleusCircle);
+            nucleusGroup.appendChild(nucleusText);
+            atomCanvas.appendChild(nucleusGroup);
+
+            // Draw Shells and Electrons
+            const shellSpacing = 45;
+            const startRadius = 55;
+
+            for (let i = 0; i < activeShells.length; i++) {
+                const radius = startRadius + (i * shellSpacing);
+                const eCount = activeShells[i];
+                
+                // Determine if this shell should be highlighted as stable
+                const isOuterShell = (i === activeShells.length - 1);
+                const isStableTarget = isStableMode && isOuterShell && (eCount === 8 || (i === 0 && eCount === 2));
+
+                // Draw Shell Path
+                const shellCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                shellCircle.setAttribute("cx", "0");
+                shellCircle.setAttribute("cy", "0");
+                shellCircle.setAttribute("r", radius);
+                shellCircle.setAttribute("fill", "none");
+                shellCircle.setAttribute("stroke", "#475569"); // slate-600
+                shellCircle.setAttribute("stroke-width", "2");
+                shellCircle.setAttribute("stroke-dasharray", "4 4");
+                shellCircle.setAttribute("class", `shell ${isStableTarget ? 'stable-shell' : ''}`);
+                
+                atomCanvas.appendChild(shellCircle);
+
+                // Draw Electrons
+                if (eCount > 0) {
+                    const angleStep = (Math.PI * 2) / eCount;
+                    // Offset angle slightly for aesthetic alternating
+                    const offset = (i % 2 === 0) ? 0 : Math.PI / eCount; 
+
+                    for (let j = 0; j < eCount; j++) {
+                        const angle = (j * angleStep) + offset;
+                        const x = radius * Math.cos(angle);
+                        const y = radius * Math.sin(angle);
+
+                        const electron = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        electron.setAttribute("cx", x);
+                        electron.setAttribute("cy", y);
+                        electron.setAttribute("r", "6");
+                        electron.setAttribute("fill", "#facc15"); // yellow-400
+                        electron.setAttribute("stroke", "#854d0e"); // yellow-800
+                        electron.setAttribute("stroke-width", "1");
+                        electron.setAttribute("class", "electron");
+                        
+                        atomCanvas.appendChild(electron);
+                    }
+                }
+            }
+        }
+
+        // Event Listeners
+        btnAdd.addEventListener('click', addElectron);
+        btnRemove.addEventListener('click', removeElectron);
+        btnCheck.addEventListener('click', checkStability);
+        
+        btnReset.addEventListener('click', () => {
+            loadElement(currentIndex);
+        });
+
+        btnPrev.addEventListener('click', () => {
+            if (currentIndex > 0) loadElement(currentIndex - 1);
+        });
+
+        btnNext.addEventListener('click', () => {
+            if (currentIndex < elementsData.length - 1) loadElement(currentIndex + 1);
+        });
+
+        // Start Game
+        loadElement(0);
+
+    </script>
+</body>
+</html>
